@@ -1,0 +1,56 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background-color: #0d1117;
+    color: #e6edf3;
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  ::selection { background: rgba(91,155,255,0.3); color: #fff; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #5b9bff; }
+}
+
+@layer components {
+  .glass {
+    background: rgba(22, 27, 34, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(48, 54, 61, 0.8);
+  }
+  .glass-hover {
+    transition: all 0.2s ease;
+  }
+  .glass-hover:hover {
+    background: rgba(28, 33, 40, 0.9);
+    border-color: rgba(91, 155, 255, 0.3);
+  }
+  .btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-medium
+           px-6 py-3 rounded-xl transition-all duration-200
+           hover:shadow-lg active:scale-95;
+  }
+  .btn-ghost {
+    @apply glass glass-hover text-gray-300 hover:text-white font-medium
+           px-6 py-3 rounded-xl transition-all duration-200 active:scale-95;
+  }
+  .input-base {
+    @apply w-full glass rounded-xl px-4 py-3 text-white placeholder-gray-500
+           text-sm focus:outline-none transition-all duration-200;
+  }
+  .card {
+    @apply glass rounded-2xl p-6;
+  }
+  .glow-blue {
+    box-shadow: 0 0 40px rgba(91, 155, 255, 0.15);
+  }
+}
