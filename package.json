@@ -1,0 +1,16 @@
+{
+  "name": "cliphub",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Universal clipboard and file transfer system",
+  "scripts": {
+    "dev": "npm run server",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["clipboard", "file-transfer", "redis", "express"],
+  "author": "Your Name",
+  "license": "MIT"
+}
