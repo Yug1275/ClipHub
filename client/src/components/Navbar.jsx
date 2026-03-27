@@ -1,10 +1,12 @@
 import { Link, useLocation } from 'react-router-dom'
 import { Clipboard, User } from 'lucide-react'
 import { FiGithub } from 'react-icons/fi'
+import DarkModeToggle from './DarkModeToggle'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import ProfileSidebar from './ProfileSidebar'
 import { resolveMediaUrl } from '../utils/imageUrl'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function Navbar() {
   const { pathname } = useLocation()
@@ -42,8 +44,7 @@ export default function Navbar() {
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-white/10">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-
+        <div className="w-full px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center group-hover:bg-blue-400 transition-colors duration-300">
               <Clipboard size={16} className="text-white" />
@@ -79,6 +80,8 @@ export default function Navbar() {
               <FiGithub size={17} />
             </a>
 
+            <DarkModeToggle />
+
             <button
               onClick={() => setSidebarOpen(true)}
               className="flex items-center gap-2 glass glass-hover px-3 py-2 rounded-xl transition-all duration-300"
@@ -105,19 +108,16 @@ export default function Navbar() {
           >
             <div className="space-y-1.5">
               <span
-                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${
-                  menuOpen ? 'rotate-45 translate-y-2' : ''
-                }`}
+                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-2' : ''
+                  }`}
               />
               <span
-                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${
-                  menuOpen ? 'opacity-0' : ''
-                }`}
+                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${menuOpen ? 'opacity-0' : ''
+                  }`}
               />
               <span
-                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${
-                  menuOpen ? '-rotate-45 -translate-y-2' : ''
-                }`}
+                className={`block w-6 h-0.5 bg-current transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-2' : ''
+                  }`}
               />
             </div>
           </button>
@@ -142,7 +142,7 @@ export default function Navbar() {
             </Link>
           ))}
 
-          
+
 
           <button
             onClick={() => {

@@ -6,6 +6,14 @@
 @layer base {
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
+  html:not(.dark) {
+    /* Magic light mode for entirely dark codebase */
+    filter: invert(1) hue-rotate(180deg);
+  }
+  html:not(.dark) img,
+  html:not(.dark) video {
+    filter: invert(1) hue-rotate(180deg); /* Re-invert media to normal */
+  }
   body {
     background-color: #0d1117;
     color: #e6edf3;

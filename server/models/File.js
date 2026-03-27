@@ -36,6 +36,10 @@ const fileSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  maxDownloads: {
+    type: Number,
+    default: null
+  },
   expiry: {
     type: String,
     enum: ['1h', '1d', '7d', '30d', 'never'],
@@ -44,6 +48,14 @@ const fileSchema = new mongoose.Schema({
   expiresAt: {
     type: Date,
     index: { expireAfterSeconds: 0 }
+  },
+  hasPassword: {
+    type: Boolean,
+    default: false
+  },
+  password: {
+    type: String,
+    default: null
   },
   isPublic: {
     type: Boolean,

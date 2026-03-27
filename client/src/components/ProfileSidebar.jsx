@@ -107,7 +107,7 @@ export default function ProfileSidebar({ isOpen, onClose }) {
 
       <aside
         className={
-          `fixed right-0 top-0 h-screen z-[70] w-[92vw] max-w-md glass border-l border-white/10 ` +
+          `fixed right-0 top-0 h-[100svh] z-[70] w-[92vw] max-w-md glass border-l border-white/10 ` +
           `transition-transform duration-300 ease-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`
         }
       >
@@ -210,10 +210,10 @@ export default function ProfileSidebar({ isOpen, onClose }) {
       </aside>
 
       {previewOpen && imageUrl && (
-        <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <button className="absolute inset-0" onClick={() => setPreviewOpen(false)} aria-label="Close preview" />
-          <div className="relative glass rounded-2xl p-3 border border-white/10 max-w-2xl w-full">
-            <img src={imageUrl} alt="Profile preview" className="w-full max-h-[78vh] object-contain rounded-xl" />
+          <div className="relative glass rounded-2xl p-3 border border-white/10 max-w-2xl w-full max-h-[calc(100svh-1.5rem)] sm:max-h-[calc(100svh-2rem)] overflow-y-auto">
+            <img src={imageUrl} alt="Profile preview" className="w-full max-h-[72svh] object-contain rounded-xl" />
             <button
               onClick={() => setPreviewOpen(false)}
               className="absolute right-5 top-5 w-9 h-9 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center"

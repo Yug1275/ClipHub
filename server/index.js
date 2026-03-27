@@ -13,6 +13,8 @@ import clipRoutes from './routes/clipRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import fileRoutes from './routes/fileRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import { createServer } from 'http';
+import { initializeSocket } from './config/socket.js';
 
 // Load environment variables
 dotenv.config();
@@ -95,7 +97,7 @@ app.use('/api/user', userRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err.stack);
-  
+
   // Multer errors
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
@@ -105,17 +107,17 @@ app.use((err, req, res, next) => {
       return res.status(400).json({ error: 'Too many files. Only one file allowed.' });
     }
   }
-  
+
   // File filter errors
   if (err.message.includes('File type') && err.message.includes('is not allowed')) {
     return res.status(400).json({ error: err.message });
   }
-  
+
   if (err.message === 'Not allowed by CORS') {
     return res.status(403).json({ error: 'CORS policy violation' });
   }
-  
-  res.status(500).json({ 
+
+  res.status(500).json({
     error: 'Something went wrong!',
     message: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
@@ -131,16 +133,23 @@ const startServer = async () => {
   try {
     // Connect to Redis
     await connectRedis();
-    
+
     // Connect to MongoDB
     await connectDB();
-    
-    app.listen(PORT, HOST, () => {
+
+    // Create HTTP server
+    const server = createServer(app);
+
+    // Initialize Socket.io
+    const io = initializeSocket(server);
+
+    server.listen(PORT, HOST, () => {
       console.log(`🚀 ClipHub server running on http://${HOST}:${PORT}`);
       console.log(`📡 API endpoint: http://${HOST}:${PORT}/api`);
       console.log(`🔍 Health check: http://${HOST}:${PORT}/health`);
       console.log(`📁 File uploads: http://${HOST}:${PORT}/api/file`);
       console.log(`🔐 Authentication: http://${HOST}:${PORT}/api/auth`);
+      console.log(`⚡ WebSocket server initialized`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

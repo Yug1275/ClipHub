@@ -1,12 +1,13 @@
 import File from '../models/File.js';
 import { getRedisClient } from '../config/redis.js';
 import { getSecondsFromExpiry } from '../utils/ttl.js';
+import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 
 export const uploadFile = async (req, res) => {
   try {
-    const { key, expiry = '1d' } = req.body;
+    const { key, expiry = '1d', password, maxViews } = req.body;
     const user = req.user;
 
     if (!key) {
@@ -26,6 +27,13 @@ export const uploadFile = async (req, res) => {
     if (!keyRegex.test(key)) {
       return res.status(400).json({
         error: 'Key can only contain letters, numbers, hyphens, and underscores'
+      });
+    }
+
+    // Validate maxViews if provided
+    if (maxViews && (isNaN(maxViews) || maxViews < 1 || maxViews > 1000)) {
+      return res.status(400).json({
+        error: 'Max downloads must be between 1 and 1000'
       });
     }
 
@@ -52,12 +60,15 @@ export const uploadFile = async (req, res) => {
       size: req.file.size,
       path: req.file.path,
       uploadedBy: user._id,
-      expiry
+      expiry,
+      maxDownloads: maxViews ? parseInt(maxViews) : null,
+      hasPassword: !!password,
+      password: password ? await bcrypt.hash(password, 10) : null
     });
 
     await fileRecord.save();
 
-    // Also store metadata in Redis for quick access
+    // Store metadata in Redis for quick access
     const redis = getRedisClient();
     const ttlSeconds = getSecondsFromExpiry(expiry);
     
@@ -69,7 +80,9 @@ export const uploadFile = async (req, res) => {
       size: req.file.size,
       uploadedBy: user._id.toString(),
       createdAt: fileRecord.createdAt.toISOString(),
-      type: 'file'
+      type: 'file',
+      hasPassword: !!password,
+      maxDownloads: fileRecord.maxDownloads
     };
 
     await redis.setEx(`file:${key}`, ttlSeconds, JSON.stringify(fileMetadata));
@@ -83,7 +96,10 @@ export const uploadFile = async (req, res) => {
         size: req.file.size,
         mimetype: req.file.mimetype,
         uploadedBy: user.name,
-        url: `${req.protocol}://${req.get('host')}/api/file/${key}`
+        hasPassword: !!password,
+        maxDownloads: fileRecord.maxDownloads,
+        url: `${req.protocol}://${req.get('host')}/clip?key=${key}`,
+        downloadUrl: `${req.protocol}://${req.get('host')}/api/file/${key}`
       }
     });
 
@@ -100,8 +116,7 @@ export const uploadFile = async (req, res) => {
     }
 
     res.status(500).json({
-      error: 'Failed to upload file',
-      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: 'Failed to upload file'
     });
   }
 };
@@ -109,6 +124,7 @@ export const uploadFile = async (req, res) => {
 export const downloadFile = async (req, res) => {
   try {
     const { key } = req.params;
+    const { password } = req.query;
     
     // First check Redis for quick access
     const redis = getRedisClient();
@@ -129,6 +145,42 @@ export const downloadFile = async (req, res) => {
       });
     }
 
+    // Check password protection
+    if (fileRecord.hasPassword) {
+      if (!password) {
+        return res.status(401).json({
+          error: 'This file is password protected',
+          requiresPassword: true
+        });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, fileRecord.password);
+      if (!isValidPassword) {
+        return res.status(401).json({
+          error: 'Invalid password',
+          requiresPassword: true
+        });
+      }
+    }
+
+    // Check download limit
+    if (fileRecord.maxDownloads && fileRecord.downloadCount >= fileRecord.maxDownloads) {
+      // Delete the file
+      if (fs.existsSync(fileRecord.path)) {
+        try {
+          fs.unlinkSync(fileRecord.path);
+        } catch (err) {
+          console.error('Error deleting file from disk:', err);
+        }
+      }
+      await File.findByIdAndDelete(fileRecord._id);
+      await redis.del(`file:${key}`);
+      
+      return res.status(410).json({
+        error: 'This file has reached its maximum download limit and has been deleted'
+      });
+    }
+
     // Check if file exists on disk
     if (!fs.existsSync(fileRecord.path)) {
       return res.status(404).json({
@@ -139,6 +191,25 @@ export const downloadFile = async (req, res) => {
     // Increment download count
     fileRecord.downloadCount += 1;
     await fileRecord.save();
+
+    // Check if should delete after this download
+    const shouldDelete = fileRecord.maxDownloads && 
+                        fileRecord.downloadCount >= fileRecord.maxDownloads;
+
+    if (shouldDelete) {
+      // Delete file after this download
+      setTimeout(async () => {
+        try {
+          if (fs.existsSync(fileRecord.path)) {
+            fs.unlinkSync(fileRecord.path);
+          }
+          await File.findByIdAndDelete(fileRecord._id);
+          await redis.del(`file:${key}`);
+        } catch (err) {
+          console.error('Error in delayed file deletion:', err);
+        }
+      }, 1000); // 1 second delay to ensure download completes
+    }
 
     // Set appropriate headers
     res.setHeader('Content-Disposition', `attachment; filename="${fileRecord.originalName}"`);
@@ -188,9 +259,13 @@ export const getFileInfo = async (req, res) => {
         size: fileRecord.size,
         mimetype: fileRecord.mimetype,
         downloadCount: fileRecord.downloadCount,
+        maxDownloads: fileRecord.maxDownloads,
+        hasPassword: fileRecord.hasPassword,
         uploadedBy: fileRecord.uploadedBy.name,
         createdAt: fileRecord.createdAt,
-        expiresAt: fileRecord.expiresAt
+        expiresAt: fileRecord.expiresAt,
+        willExpireAfterNextDownload: fileRecord.maxDownloads && 
+          fileRecord.downloadCount >= fileRecord.maxDownloads - 1
       }
     });
 
@@ -248,5 +323,35 @@ export const deleteFile = async (req, res) => {
     res.status(500).json({
       error: 'Failed to delete file'
     });
+  }
+};
+
+// Check if file exists (for overwrite warning)
+export const checkFileExists = async (req, res) => {
+  try {
+    const { key } = req.params;
+    
+    const fileRecord = await File.findOne({ key }).populate('uploadedBy', 'name');
+    
+    if (fileRecord) {
+      res.json({
+        exists: true,
+        info: {
+          originalName: fileRecord.originalName,
+          size: fileRecord.size,
+          uploadedBy: fileRecord.uploadedBy.name,
+          createdAt: fileRecord.createdAt,
+          downloadCount: fileRecord.downloadCount,
+          maxDownloads: fileRecord.maxDownloads,
+          hasPassword: fileRecord.hasPassword
+        }
+      });
+    } else {
+      res.json({ exists: false });
+    }
+
+  } catch (error) {
+    console.error('Error checking file exists:', error);
+    res.status(500).json({ error: 'Failed to check file' });
   }
 };
