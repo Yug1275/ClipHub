@@ -40,6 +40,12 @@ export default function FileUpload({ fileKey, onKeyChange }) {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [overwriteWarningOpen, setOverwriteWarningOpen] = useState(false);
   const [existingFileInfo, setExistingFileInfo] = useState(null);
+  
+  // Detect default mode based on IP, allow user to toggle it
+  const defaultIsLocal = /^192\.168\.|^10\.|^172\.(1[6-9]|2[0-9]|3[0-1])\.|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
+  const [uploadMode, setUploadMode] = useState(defaultIsLocal ? 'local' : 'global');
+  const isLocalMode = uploadMode === 'local';
+
   const fileInputRef = useRef(null);
 
   const { uploadFile, downloadFile, deleteFile, checkFileExists, uploading, error } = useFileUpload();
@@ -47,10 +53,17 @@ export default function FileUpload({ fileKey, onKeyChange }) {
   const toast = useToast();
 
   const handleFileSelect = (file) => {
-    if (file && file.size <= 10 * 1024 * 1024) { // 10MB limit
+    if (!file) return;
+    if (isLocalMode) {
+      // Local mode: No size limit
       setSelectedFile(file);
     } else {
-      toast.error('File size must be less than 10MB');
+      // Global mode: 10MB limit
+      if (file.size <= 10 * 1024 * 1024) {
+        setSelectedFile(file);
+      } else {
+        toast.error('File size must be less than 10MB in Global Mode');
+      }
     }
   };
 
@@ -83,7 +96,7 @@ export default function FileUpload({ fileKey, onKeyChange }) {
 
   const performUpload = async () => {
     try {
-      const options = {};
+      const options = { uploadMode };
       if (password) options.password = password;
       if (maxDownloads) options.maxViews = maxDownloads; // Using maxViews for consistency
 
@@ -186,6 +199,40 @@ export default function FileUpload({ fileKey, onKeyChange }) {
         </button>
       </div>
 
+      {/* Network Mode Toggle */}
+      <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl border border-white/10">
+        <div className="flex-1">
+          <p className="text-sm font-medium text-white">Network Mode</p>
+          <p className="text-xs text-gray-400">
+            {isLocalMode 
+              ? 'Local Mode: Unlimited size & any file type'
+              : 'Global Mode: Max 10MB per file'}
+          </p>
+        </div>
+        <div className="flex gap-1 bg-black/40 p-1 rounded-lg">
+          <button
+            onClick={() => setUploadMode('global')}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+              !isLocalMode 
+                ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Global
+          </button>
+          <button
+            onClick={() => setUploadMode('local')}
+            className={`px-3 py-1.5 text-xs rounded-md transition-all ${
+              isLocalMode 
+                ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' 
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Local
+          </button>
+        </div>
+      </div>
+
       {error && (
         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
           <AlertCircle size={16} className="text-red-400" />
@@ -220,7 +267,7 @@ export default function FileUpload({ fileKey, onKeyChange }) {
           type="file"
           onChange={(e) => handleFileSelect(e.target.files[0])}
           className="hidden"
-          accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.docx,.xlsx,.pptx,.zip,.json"
+          accept={isLocalMode ? "*" : ".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.docx,.xlsx,.pptx,.zip,.json"}
         />
 
         <Upload size={32} className="mx-auto text-gray-500 mb-3" />
@@ -241,8 +288,8 @@ export default function FileUpload({ fileKey, onKeyChange }) {
             <p className="text-gray-400 mb-1">
               {dragActive ? 'Drop your file here' : 'Click to select or drag & drop'}
             </p>
-            <p className="text-gray-500 text-sm">
-              Images, documents, archives up to 10MB
+            <p className={`text-sm ${isLocalMode ? 'text-brand-400 font-medium' : 'text-gray-500'}`}>
+              {isLocalMode ? 'Unlimited file size in Local Mode' : 'Images, documents, archives up to 10MB (Global Mode)'}
             </p>
           </div>
         )}

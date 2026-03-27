@@ -20,10 +20,15 @@ export const useFileUpload = () => {
       if (options.password) formData.append('password', options.password);
       if (options.maxViews) formData.append('maxViews', options.maxViews.toString());
 
+      const headers = {};
+      if (options.uploadMode) {
+        headers['x-upload-mode'] = options.uploadMode;
+      }
+
       const response = await authFetch('/api/file', {
         method: 'POST',
         body: formData,
-        headers: {} // Don't set Content-Type for FormData
+        headers // Don't set Content-Type for FormData
       });
 
       const data = await response.json();

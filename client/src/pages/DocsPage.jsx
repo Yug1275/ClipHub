@@ -38,8 +38,9 @@ const sections = [
     desc: 'Secure drag & drop uploads',
     content: `
       • Requires login (JWT protected)
-      • Max 10MB per file
-      • Supported: Images, PDFs, Docs, ZIP, Code files
+      • Local Mode: Unlimited size & any file type (use for large files!)
+      • Global Mode: Max 10MB per file (use for small files)
+      • Supported in Global: Images, PDFs, Docs, ZIP, Code files
       • Auto-expiry options (1h → Never)
       • Download count tracking
     `

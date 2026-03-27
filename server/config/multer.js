@@ -47,14 +47,65 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Multer configuration
-const upload = multer({
+// Helper function to detect local network
+export const isLocalIp = (ip) => {
+  if (!ip) return false;
+  return (
+    ip === '::1' ||
+    ip === '127.0.0.1' ||
+    ip.startsWith('::ffff:127.0.0.1') ||
+    ip.startsWith('192.168.') ||
+    ip.startsWith('::ffff:192.168.') ||
+    ip.startsWith('10.') ||
+    ip.startsWith('::ffff:10.') ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip) ||
+    /^::ffff:172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)
+  );
+};
+
+// Global config: 10MB limit and restricted file types
+const globalUpload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
-    files: 1 // Single file upload
+    files: 1
   }
 });
+
+// Local config: Unlimited size and any file type
+const localUpload = multer({
+  storage,
+  limits: {
+    files: 1
+  }
+});
+
+// Dynamic multer wrapper
+const upload = {
+  single: (fieldname) => {
+    return (req, res, next) => {
+      // Get the client IP
+      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+      const isForcedLocal = req.headers['x-upload-mode'] === 'local';
+      
+      if (isForcedLocal || isLocalIp(ip)) {
+        req.isLocalMode = true; // Attach mode to request
+        return localUpload.single(fieldname)(req, res, next);
+      } else {
+        req.isLocalMode = false;
+        return globalUpload.single(fieldname)(req, res, (err) => {
+          if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              return res.status(400).json({ error: 'File size exceeds 10MB limit in Global Mode. Please switch to a local connection for unlimited sizes.' });
+            }
+            return res.status(400).json({ error: err.message });
+          }
+          next();
+        });
+      }
+    };
+  }
+};
 
 export default upload;

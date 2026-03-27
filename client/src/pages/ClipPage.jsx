@@ -533,10 +533,15 @@ export default function ClipPage() {
           </>
         ) : (
           /* File Upload Tab */
-          <FileUpload
-            fileKey={key}
-            onKeyChange={setKey}
-          />
+          <>
+            <div className="mb-4 p-3 bg-brand-500/10 border border-brand-500/20 rounded-lg text-sm text-gray-300">
+              💡 <strong className="text-brand-400">Tip:</strong> For transferring large files, select <strong>Local Mode</strong>. For small files up to 10MB, use <strong>Global Mode</strong>.
+            </div>
+            <FileUpload
+              fileKey={key}
+              onKeyChange={setKey}
+            />
+          </>
         )}
 
       </div>
