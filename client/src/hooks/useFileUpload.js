@@ -5,11 +5,13 @@ import { API_URL } from '../utils/api';
 export const useFileUpload = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  const { authFetch } = useAuth();
+  const [uploadProgress, setUploadProgress] = useState({ loaded: 0, total: 0, speed: 0, timeRemaining: 0 });
+  const { authFetch, token } = useAuth();
 
   const uploadFile = async (key, file, expiry = '1d', options = {}) => {
     setUploading(true);
     setError(null);
+    setUploadProgress({ loaded: 0, total: file.size, speed: 0, timeRemaining: 0 });
 
     try {
       const formData = new FormData();
@@ -21,23 +23,90 @@ export const useFileUpload = () => {
       if (options.password) formData.append('password', options.password);
       if (options.maxViews) formData.append('maxViews', options.maxViews.toString());
 
-      const headers = {};
-      if (options.uploadMode) {
-        headers['x-upload-mode'] = options.uploadMode;
-      }
+      const data = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let startTime = Date.now();
+        let lastLoaded = 0;
 
-      const response = await authFetch('/api/file', {
-        method: 'POST',
-        body: formData,
-        headers // Don't set Content-Type for FormData
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const currentTime = Date.now();
+            const timeElapsed = (currentTime - startTime) / 1000; // in seconds
+            
+            if (timeElapsed > 0.5) { // Update speed every 0.5 seconds
+              const bytesLoaded = event.loaded;
+              const bytesDiff = bytesLoaded - lastLoaded;
+              const speedBytesPerSec = bytesDiff / timeElapsed; // bytes per second
+              
+              const remainingBytes = event.total - bytesLoaded;
+              const timeRemainingSecs = speedBytesPerSec > 0 ? remainingBytes / speedBytesPerSec : 0;
+
+              setUploadProgress({
+                loaded: bytesLoaded,
+                total: event.total,
+                speed: speedBytesPerSec,
+                timeRemaining: timeRemainingSecs
+              });
+
+              lastLoaded = bytesLoaded;
+              startTime = currentTime;
+            } else {
+              // Just update the loaded amount if not enough time has passed to calculate speed accurately
+              setUploadProgress(prev => ({
+                ...prev,
+                loaded: event.loaded,
+                total: event.total
+              }));
+            }
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data.error) {
+                reject(new Error(data.error));
+              } else {
+                resolve(data);
+              }
+            } catch (e) {
+              resolve(xhr.responseText);
+            }
+          } else {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              reject(new Error(data.error || 'Upload failed'));
+            } catch (e) {
+              reject(new Error('Upload failed'));
+            }
+          }
+        });
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred during upload'));
+        });
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload aborted'));
+        });
+
+        xhr.open('POST', `${API_URL}/api/file`, true);
+
+        const headers = {};
+        if (options.uploadMode) {
+          headers['x-upload-mode'] = options.uploadMode;
+        }
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        for (const [key, value] of Object.entries(headers)) {
+          xhr.setRequestHeader(key, value);
+        }
+
+        xhr.send(formData);
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
-      }
-
       return data;
     } catch (err) {
       setError(err.message);
@@ -135,6 +204,7 @@ export const useFileUpload = () => {
     deleteFile,
     checkFileExists,
     uploading,
+    uploadProgress,
     error
   };
 };

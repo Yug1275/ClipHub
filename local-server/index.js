@@ -30,7 +30,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-upload-mode', 'Cache-Control', 'Pragma']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10gb' }));
+app.use(express.urlencoded({ extended: true, limit: '10gb' }));
 
 const store = new Map();
 
@@ -278,6 +279,11 @@ app.delete("/api/file/:key", (req, res) => {
 });
 
 const PORT = 5001;
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(` Local server running on http://0.0.0.0:${PORT}`);
 });
+
+// Disable timeouts for massive file transfers
+server.setTimeout(0);
+server.keepAliveTimeout = 0;
+server.headersTimeout = 0;

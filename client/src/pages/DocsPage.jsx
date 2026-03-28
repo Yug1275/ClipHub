@@ -67,6 +67,8 @@ const sections = [
 
 export default function DocsPage() {
   const { isAuthenticated } = useAuth()
+  const [key, setKey] = useState("")
+
   const [activeSection, setActiveSection] = useState('getting-started')
   const [searchTerm, setSearchTerm] = useState('')
   const [copied, setCopied] = useState(false)
@@ -139,11 +141,12 @@ export default function DocsPage() {
                   <input
                     type="text"
                     placeholder="Enter a key (e.g. demo-123)"
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
                     className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
                   />
                   <a
-                    href="/clip?key=demo-123"
-                    className="btn-primary py-2 px-4 text-sm"
+                    href={`/clip?key=${key}`} className="btn-primary py-2 px-4 text-sm"
                   >
                     Open Clip
                   </a>

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useFileUpload } from '../hooks/useFileUpload';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from './Toast';
+import { LoadingSpinner } from './LoadingSpinner';
 import QRCodeModal from './QRCodeModal';
 import PasswordModal from './PasswordModal';
 import OverwriteWarning from './OverwriteWarning';
@@ -51,7 +52,7 @@ export default function FileUpload({ fileKey, onKeyChange }) {
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
-  const { uploadFile, downloadFile, deleteFile, checkFileExists, uploading, error } = useFileUpload();
+  const { uploadFile, downloadFile, deleteFile, checkFileExists, uploading, uploadProgress, error } = useFileUpload();
   const { isAuthenticated } = useAuth();
   const toast = useToast();
 
@@ -159,6 +160,22 @@ export default function FileUpload({ fileKey, onKeyChange }) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatSpeed = (bytesPerSec) => {
+    if (bytesPerSec === 0) return '0 B/s';
+    const k = 1024;
+    const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+    const i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+    return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatTimeInfo = (seconds) => {
+    if (!seconds || seconds === Infinity) return '';
+    if (seconds < 60) return `${Math.ceil(seconds)}s remaining`;
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.ceil(seconds % 60);
+    return `${mins}m ${secs}s remaining`;
   };
 
 if (!isLocal && !isAuthenticated) {
@@ -400,7 +417,18 @@ if (!isLocal && !isAuthenticated) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-4">
+              {uploading && uploadProgress.total > 0 && (
+                <div className="flex flex-col items-end text-xs text-brand-400 font-mono">
+                  <span>{Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%</span>
+                  {uploadProgress.speed > 0 && (
+                    <span className="opacity-80">
+                      {formatSpeed(uploadProgress.speed)} • {formatTimeInfo(uploadProgress.timeRemaining)}
+                    </span>
+                  )}
+                </div>
+              )}
+              
               <button
                 onClick={handleDelete}
                 disabled={!fileKey}
@@ -411,9 +439,13 @@ if (!isLocal && !isAuthenticated) {
               <button
                 onClick={handleUpload}
                 disabled={!fileKey || uploading}
-                className="btn-primary text-sm py-2 px-4 disabled:opacity-40"
+                className="btn-primary flex items-center justify-center gap-2 text-sm py-2 px-4 disabled:opacity-40 min-w-[100px]"
               >
-                {uploading ? 'Uploading...' : 'Upload file'}
+                {uploading ? (
+                  <>
+                    <LoadingSpinner size={16} />
+                  </>
+                ) : 'Upload file'}
               </button>
             </div>
           </div>

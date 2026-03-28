@@ -9,6 +9,11 @@ export default {
         body: ['DM Sans', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
+      colors: {
+        brand: {
+          400: '#5b9bff',
+        }
+      },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4,0,0.6,1) infinite',
         'fade-up': 'fadeUp 0.6s ease forwards',

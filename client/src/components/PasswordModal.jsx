@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Lock, Eye, EyeOff } from 'lucide-react';
 
 export default function PasswordModal({ isOpen, onClose, onSubmit, title = "Password Required" }) {
@@ -30,8 +31,8 @@ export default function PasswordModal({ isOpen, onClose, onSubmit, title = "Pass
     onClose();
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+  const content = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
       <div className="w-full max-w-md glass rounded-2xl p-5 sm:p-6 relative max-h-[calc(100svh-1.5rem)] sm:max-h-[calc(100svh-2rem)] overflow-y-auto">
         
         <button
@@ -91,4 +92,6 @@ export default function PasswordModal({ isOpen, onClose, onSubmit, title = "Pass
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
