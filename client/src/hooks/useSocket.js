@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { SOCKET_URL } from '../utils/api';
+import { SOCKET_URL, isLocal } from '../utils/api';
 
 export const useSocket = () => {
   const socketRef = useRef(null);
@@ -9,6 +9,12 @@ export const useSocket = () => {
   const [typingUsers, setTypingUsers] = useState(new Set());
 
   useEffect(() => {
+    if (isLocal) {
+      // Don't connect socket in standalone/local mode
+      setIsConnected(false);
+      return;
+    }
+
     socketRef.current = io(SOCKET_URL, {
       transports: ['websocket', 'polling']
     });
@@ -63,7 +69,9 @@ export const useSocket = () => {
 
     return () => {
       clearInterval(cleanupTyping);
-      socket.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
     };
   }, []);
 

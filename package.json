@@ -4,13 +4,9 @@
   "type": "module",
   "description": "Universal clipboard and file transfer system",
   "scripts": {
-    "postinstall": "npm install --prefix client && npm install --prefix server && npm install --prefix local-server",
-    "dev:global": "concurrently \"npm run server\" \"npm run client\"",
-    "dev:local": "concurrently \"cd local-server && npm run dev\" \"cd client && npm run dev:local\"",
-    "server": "cd server && npm run dev",
-    "client": "cd client && npm run dev",
-    "build": "cd client && npm run build",
-    "start": "cd server && npm start"
+    "start": "cd server && npm start",
+    "install:all": "npm install --prefix client && npm install --prefix server && npm install --prefix local-server",
+    "install:local": "npm install --prefix client && npm install --prefix local-server"
   },
   "keywords": [
     "clipboard",
