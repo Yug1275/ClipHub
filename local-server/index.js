@@ -16,7 +16,13 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
-const upload = multer({ storage });
+// Remove any artificial limits or memory overhead for multer to allow extremely fast disk streaming
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 * 1024 // 10 GB limit for local network max buffer
+  }
+});
 
 const app = express();
 app.use(cors({
@@ -68,7 +74,7 @@ app.get("/api/user/profile", (req, res) => {
 
 // Text clip endpoints
 app.post("/api/clip", (req, res) => {
-  const { key, content, expiry, password, viewLimit } = req.body;
+  const { key, content, expiry, password, viewLimit, maxViews } = req.body;
   
   // Default to 1 hour if not specified in MS
   let expiryMs = 60 * 60 * 1000;
@@ -79,11 +85,15 @@ app.post("/api/clip", (req, res) => {
     else if (expiry.endsWith('d')) expiryMs = value * 24 * 60 * 60 * 1000;
   }
 
+  // Handle both map keys from client
+  const limit = viewLimit ? parseInt(viewLimit) : (maxViews ? parseInt(maxViews) : null);
+  const exists = store.has(key);
+
   store.set(key, {
     type: 'text',
     content,
     password,      
-    viewLimit: viewLimit ? parseInt(viewLimit) : null,
+    viewLimit: limit,
     views: 0,
     expiry: Date.now() + expiryMs,
     createdAt: new Date().toISOString()
@@ -92,6 +102,7 @@ app.post("/api/clip", (req, res) => {
   res.json({ 
     success: true, 
     key,
+    overwritten: exists,
     expiresIn: Math.floor(expiryMs / 1000)
   });
 });
@@ -112,16 +123,21 @@ app.get("/api/clip/:key", (req, res) => {
   const data = store.get(req.params.key);
 
   if (!data || data.type !== 'text') {
-    return res.status(404).json({ message: "Not found or expired" });
+    return res.status(404).json({ error: "Not found or expired" });
   }
 
   if (data.expiry < Date.now()) {
     store.delete(req.params.key);
-    return res.status(410).json({ message: "Expired" });
+    return res.status(410).json({ error: "Expired" });
   }
 
-  if (data.password && data.password !== req.query.password) {
-    return res.status(401).json({ message: "Incorrect password" });
+  if (data.password) {
+    if (!req.query.password) {
+      return res.status(401).json({ error: "This clip is password protected" });
+    }
+    if (data.password !== req.query.password) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
   }
 
   data.views++;
@@ -145,7 +161,7 @@ app.get("/api/clip/:key/info", (req, res) => {
   const data = store.get(req.params.key);
 
   if (!data) {
-    return res.status(404).json({ message: "Not found or expired" });
+    return res.status(404).json({ error: "Not found or expired" });
   }
 
   res.json({ 
@@ -171,7 +187,7 @@ app.post("/api/file", upload.single('file'), (req, res) => {
     return res.status(400).json({ error: "No file uploaded" });
   }
 
-  const { key, expiry, password, viewLimit } = req.body;
+  const { key, expiry, password, viewLimit, maxViews } = req.body;
 
   let expiryMs = 24 * 60 * 60 * 1000;
   if (expiry) {
@@ -181,6 +197,10 @@ app.post("/api/file", upload.single('file'), (req, res) => {
     else if (expiry.endsWith('d')) expiryMs = value * 24 * 60 * 60 * 1000;      
   }
 
+  // Handle both possible keys from client
+  const limit = viewLimit ? parseInt(viewLimit) : (maxViews ? parseInt(maxViews) : null);
+  const exists = store.has(key);
+
   store.set(key, {
     type: 'file',
     path: req.file.path,
@@ -188,7 +208,7 @@ app.post("/api/file", upload.single('file'), (req, res) => {
     mimetype: req.file.mimetype,
     size: req.file.size,
     password,
-    viewLimit: viewLimit ? parseInt(viewLimit) : null,
+    viewLimit: limit,
     views: 0,
     expiry: Date.now() + expiryMs,
     createdAt: new Date().toISOString()
@@ -197,6 +217,7 @@ app.post("/api/file", upload.single('file'), (req, res) => {
   res.json({
     success: true,
     key,
+    overwritten: exists,
     expiresIn: Math.floor(expiryMs / 1000),
     file: {
       name: req.file.originalname,
@@ -221,16 +242,21 @@ app.get("/api/file/:key", (req, res) => {
   const data = store.get(req.params.key);
 
   if (!data || data.type !== 'file') {
-    return res.status(404).json({ message: "Not found or expired" });
+    return res.status(404).json({ error: "Not found or expired" });
   }
 
   if (data.expiry < Date.now()) {
     store.delete(req.params.key);
-    return res.status(410).json({ message: "Expired" });
+    return res.status(410).json({ error: "Expired" });
   }
 
-  if (data.password && data.password !== req.query.password) {
-    return res.status(401).json({ message: "Incorrect password" });
+  if (data.password) {
+    if (!req.query.password) {
+      return res.status(401).json({ error: "This file is password protected" });
+    }
+    if (data.password !== req.query.password) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
   }
 
   data.views++;
@@ -252,6 +278,6 @@ app.delete("/api/file/:key", (req, res) => {
 });
 
 const PORT = 5001;
-app.listen(PORT, () => {
-  console.log(` Local server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(` Local server running on http://0.0.0.0:${PORT}`);
 });
