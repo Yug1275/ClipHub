@@ -338,8 +338,7 @@ export default function DocsPage() {
             <div>
               <h4 className="text-lg font-semibold text-white mb-4">Text Clips</h4>
               <div className="space-y-8">
-                <APIExample example={API_EXAMPLES.textClip.saveLocal} />
-                <APIExample example={API_EXAMPLES.textClip.saveGlobal} />
+                <APIExample example={API_EXAMPLES.textClip.save} />
                 <APIExample example={API_EXAMPLES.textClip.get} />
               </div>
             </div>

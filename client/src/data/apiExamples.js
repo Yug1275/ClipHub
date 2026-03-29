@@ -1,24 +1,11 @@
 export const API_EXAMPLES = {
     textClip: {
-        saveLocal: {
-            title: "Save Text Clip (Local Mode)",
+        save: {
+            title: "Save Text Clip",
             method: "POST",
             endpoint: "/api/clip",
-            description: "Save a text clip using the Local Mode endpoint.",
-            curl: `curl -X POST http://localhost:5001/api/clip \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key": "local-test",
-    "content": "Hello Local!",
-    "expiry": "10m"
-  }'`
-        },
-        saveGlobal: {
-            title: "Save Text Clip (Global Mode)",
-            method: "POST",
-            endpoint: "/api/clip",
-            description: "Save a text clip using the Global Mode endpoint with persistence.",
-            curl: `curl -X POST https://api.cliphub.app/api/clip \
+            description: "Save a text clip to the clipboard.",
+            curl: `curl -X POST https://cliphub-ksuf.onrender.com/api/clip \
   -H "Content-Type: application/json" \
   -d '{
     "key": "global-test",
@@ -73,7 +60,7 @@ export const API_EXAMPLES = {
                     size: 1024000,
                     mimetype: "application/pdf",
                     uploadedBy: "John Doe",
-                    url: "http://localhost:5000/api/file/my-document"
+                    url: "https://cliphub-ksuf.onrender.com/api/file/my-document"
                 }
             }
         },
