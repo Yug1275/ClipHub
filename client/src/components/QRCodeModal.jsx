@@ -7,7 +7,7 @@ import { isLocal as isLocalMode } from '../utils/api';
 
 const LOCAL_PORT = '5173';
 const DEFAULT_LOCAL_IP = '10.110.48.205';
-const GLOBAL_BASE_URL = 'https://cliphub.app';
+const GLOBAL_BASE_URL = 'https://clipdothub.netlify.app/';
 const LOCAL_IP_STORAGE_KEY = 'cliphub_last_local_ip';
 
 const isValidIPv4 = (value) => {
