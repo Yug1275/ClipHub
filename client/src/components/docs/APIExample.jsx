@@ -89,7 +89,7 @@ export default function APIExample({ example }) {
                   <div>
                     <p className="font-medium text-white mb-1">URL:</p>
                     <p className="font-mono bg-black/30 p-3 rounded text-gray-300 break-all">
-                      http://localhost:5000{example.endpoint}
+                      https://cliphub-ksuf.onrender.com{example.endpoint}
                     </p>
                   </div>
 
@@ -139,10 +139,6 @@ export default function APIExample({ example }) {
                   )}
                 </div>
               </div>
-
-              <p className="text-xs text-gray-500">
-                Tip: Use <span className="font-mono text-amber-400">http://localhost:5000</span> for local development
-              </p>
             </div>
           )}
 

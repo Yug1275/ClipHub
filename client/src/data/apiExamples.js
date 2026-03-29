@@ -5,22 +5,38 @@ export const API_EXAMPLES = {
             method: "POST",
             endpoint: "/api/clip",
             description: "Save a text clip to the clipboard.",
-            curl: `curl -X POST https://cliphub-ksuf.onrender.com/api/clip \
-  -H "Content-Type: application/json" \
-  -d '{
-    "key": "global-test",
-    "content": "Hello World!",
-    "expiry": "24h"
-  }'`
+
+            requestBody: {
+                key: "global-test",
+                content: "Hello World!",
+                expiry: "24h",        // optional
+                password: "secret123", // optional
+                maxViews: 5           // optional
+            },
+
+            response: {
+                success: true,
+                message: "Clip saved successfully",
+                key: "global-test",
+                expiresIn: 86400,
+                overwritten: false,
+                hasPassword: true,
+                maxViews: 5,
+                url: "https://cliphub-ksuf.onrender.com/clip?key=global-test",
+                apiUrl: "https://cliphub-ksuf.onrender.com/api/clip/global-test"
+            }
         },
+
         get: {
             title: "Get Text Clip",
             method: "GET/POST",
             endpoint: "/api/clip/:key",
             description: "Retrieve a text clip. Use POST if the clip is password-protected",
+
             requestBody: {
                 password: "secret123"
             },
+
             response: {
                 success: true,
                 data: {
@@ -60,7 +76,7 @@ export const API_EXAMPLES = {
                     size: 1024000,
                     mimetype: "application/pdf",
                     uploadedBy: "John Doe",
-                    url: "https://cliphub-ksuf.onrender.com/api/file/my-document"
+                    url: "http://localhost:5000/api/file/my-document"
                 }
             }
         },
@@ -123,29 +139,29 @@ export const API_EXAMPLES = {
 };
 
 export const SETUP_GUIDES = {
-  localMode: {
-    title: " Local Setup (No Database Required)",
-    steps: [
-      {
-        title: "Clone the repository",
-        description: "The local version is perfect for fast transfers on your local network. It does not require MongoDB, Redis, or User Authentication. (Note: You can completely ignore the `server` folder when running locally, as it's only for the global version).",
-        code: "git clone https://github.com/Yug1275/ClipHub.git\ncd ClipHub"
-      },
-      {
-        title: "Install Dependencies", 
-        description: "Install packages for both the client and local server by running this command in the root folder:",
-        code: "npm run install:local"
-      },
-      {
-        title: "Start the Local Server",
-        description: "Open a new terminal and run. The local server will start on port 5001.",
-        code: "cd local-server\nnpm run dev"
-      },
-      {
-        title: "Start the Client (Website)",
-        description: "Open a second terminal and run. The client will start in standalone (local) mode.",
-        code: "cd ClipHub\ncd client\nnpm run dev"
-      }
-    ]
-  }
+    localMode: {
+        title: " Local Setup (No Database Required)",
+        steps: [
+            {
+                title: "Clone the repository",
+                description: "The local version is perfect for fast transfers on your local network. It does not require MongoDB, Redis, or User Authentication. (Note: You can completely ignore the `server` folder when running locally, as it's only for the global version).",
+                code: "git clone https://github.com/Yug1275/ClipHub.git\ncd ClipHub"
+            },
+            {
+                title: "Install Dependencies",
+                description: "Install packages for both the client and local server by running this command in the root folder:",
+                code: "npm run install:local"
+            },
+            {
+                title: "Start the Local Server",
+                description: "Open a new terminal and run. The local server will start on port 5001.",
+                code: "cd local-server\nnpm run dev"
+            },
+            {
+                title: "Start the Client (Website)",
+                description: "Open a second terminal and run. The client will start in standalone (local) mode.",
+                code: "cd ClipHub\ncd client\nnpm run dev"
+            }
+        ]
+    }
 };

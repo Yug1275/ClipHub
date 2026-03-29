@@ -327,13 +327,7 @@ export default function DocsPage() {
       case 'api-reference':
         return (
           <div className="space-y-8">
-            <div className="prose prose-invert max-w-none">
-              <h3 className="text-xl font-semibold text-white mb-6">API Documentation</h3>
-              <p className="text-gray-400 mb-8">
-                Complete REST API reference with Postman examples. All endpoints return JSON responses.
-              </p>
-            </div>
-
+            
             {/* Text Clips API */}
             <div>
               <h4 className="text-lg font-semibold text-white mb-4">Text Clips</h4>
