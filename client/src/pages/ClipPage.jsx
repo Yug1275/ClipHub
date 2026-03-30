@@ -252,7 +252,7 @@ export default function ClipPage() {
           <div className="mb-4 p-3 bg-brand-500/10 border border-brand-500/20 rounded-lg flex items-center gap-2">
             <AlertCircle size={16} className="text-brand-400" />
             <span className="text-brand-400 text-sm">
-              Running in Local Mode. For Global sharing, visit <a href="https://cliphub.netlify.app" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline font-medium">cliphub.netlify.app</a>
+              Running in Local Mode. For Global sharing, visit <a href="https://clipdothub.netlify.app" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline font-medium">clipdothub.netlify.app</a>
             </span>
           </div>
         ) : isAuthenticated ? (
