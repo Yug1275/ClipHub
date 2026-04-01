@@ -17,12 +17,16 @@ export const uploadProfileImage = async (req, res) => {
 
     const user = await User.findById(req.user._id);
     if (!user) {
+      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(404).json({
         error: 'User not found'
       });
     }
 
-    const relativePath = `/uploads/profile/${req.file.filename}`;
+    // Convert file to Base64 to store directly in MongoDB
+    // This avoids losing images when Render's free tier ephemeral file system restarts
+    const fileData = fs.readFileSync(req.file.path);
+    const base64String = `data:${req.file.mimetype};base64,${fileData.toString('base64')}`;
 
     if (user.profileImage && user.profileImage.startsWith('/uploads/')) {
       const oldPath = path.join(uploadsRoot, user.profileImage.replace('/uploads/', ''));
@@ -31,8 +35,13 @@ export const uploadProfileImage = async (req, res) => {
       }
     }
 
-    user.profileImage = relativePath;
+    user.profileImage = base64String;
     await user.save();
+
+    // Clean up temporary local file since it's now in the database
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
 
     res.status(200).json({
       success: true,

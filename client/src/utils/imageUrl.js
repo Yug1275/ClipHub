@@ -4,6 +4,11 @@ const API_BASE_URL = API_URL.replace(/\/api\/?$/, '')
 
 export function resolveMediaUrl(resourcePath, version = '') {
 	if (!resourcePath) return ''
+	
+	if (resourcePath.startsWith('data:')) {
+		return resourcePath
+	}
+
 	let resolvedUrl
 	if (resourcePath.startsWith('http://') || resourcePath.startsWith('https://')) {
 		resolvedUrl = resourcePath
