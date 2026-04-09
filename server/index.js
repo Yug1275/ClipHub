@@ -6,7 +6,6 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import corsMiddleware from './middleware/cors.js';
-import rateLimiter from './middleware/rateLimiter.js';
 import { connectRedis } from './config/redis.js';
 import connectDB from './config/database.js';
 import clipRoutes from './routes/clipRoutes.js';
@@ -55,9 +54,6 @@ if (ENABLE_HTTP_LOGS) {
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting
-app.use('/api', rateLimiter(60000, 100)); // 100 requests per minute
 
 // Mode enforcement middleware
 app.use((req, res, next) => {
