@@ -20,5 +20,8 @@
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "express-rate-limit": "^8.3.2"
   }
 }
