@@ -63,12 +63,12 @@ export const isLocalIp = (ip) => {
   );
 };
 
-// Global config: 10MB limit and restricted file types
+// Global config: 1.1GB limit and restricted file types
 const globalUpload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 1100 * 1024 * 1024, // 1.1GB limit (1GB 100MB)
     files: 1
   }
 });
@@ -97,7 +97,7 @@ const upload = {
         return globalUpload.single(fieldname)(req, res, (err) => {
           if (err) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-              return res.status(400).json({ error: 'File size exceeds 10MB limit in Global Mode. Please switch to a local connection for unlimited sizes.' });
+              return res.status(400).json({ error: 'File size exceeds 1.1GB limit in Global Mode. Please switch to a local connection for unlimited sizes.' });
             }
             return res.status(400).json({ error: err.message });
           }

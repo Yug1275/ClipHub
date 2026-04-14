@@ -54,7 +54,6 @@ export default function ClipPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false)
   // Real-time features
   const socket = useSocket()
-  const [lastContentUpdate, setLastContentUpdate] = useState(null)
   const [isTyping, setIsTyping] = useState(false)
   const [typingTimeout, setTypingTimeout] = useState(null)
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
@@ -85,9 +84,8 @@ export default function ClipPage() {
 
       const cleanup = socket.onContentUpdate((data) => {
         if (data.socketId !== socket.socket?.id) {
-          setLastContentUpdate(data)
-          // Don't automatically update content to avoid conflicts
-          // Instead, show a notification that content was updated
+          // Immediately update content instead of waiting for refresh
+          setContent(data.content)
         }
       })
 
@@ -306,34 +304,6 @@ export default function ClipPage() {
             <span className="text-red-400 text-sm">{apiError}</span>
           </div>
         )}
-
-        {/* Real-time update notification */}
-        <AnimatePresence>
-          {lastContentUpdate && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2">
-                <LoadingSpinner size={16} />
-                <span className="text-blue-400 text-sm">
-                  {lastContentUpdate.userName} updated this clip
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  setContent(lastContentUpdate.content)
-                  setLastContentUpdate(null)
-                }}
-                className="text-blue-400 hover:text-blue-300 text-sm underline"
-              >
-                Refresh
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Content Area */}
         {activeTab === 'text' ? (
