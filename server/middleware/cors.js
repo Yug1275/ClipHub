@@ -9,7 +9,8 @@ const corsOptions = {
     const allowedOrigins = [
       'https://cliphub.netlify.app',
       'https://clipdothub.netlify.app',
-      process.env.CLIENT_URL
+      process.env.CLIENT_URL,
+      // Add exact frontend domains here if variable isn't set
     ].filter(Boolean);
 
     if (allowedOrigins.includes(origin) || localhostRegex.test(origin) || localNetworkRegex.test(origin)) {

@@ -86,6 +86,11 @@ app.get('/', (req, res) => {
   });
 });
 
+// Uptime monitoring ping endpoint
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',

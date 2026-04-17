@@ -17,7 +17,8 @@ export const useSocket = () => {
     }
 
     socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket', 'polling']
+      transports: ['websocket'], // Force WebSocket for Railway
+      withCredentials: true
     });
 
     const socket = socketRef.current;

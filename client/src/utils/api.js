@@ -8,6 +8,6 @@ export const API_URL = isLocal
   ? `http://${window.location.hostname}:5001` 
   : import.meta.env.DEV 
     ? (import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5000`)
-    : (import.meta.env.VITE_API_URL || "https://cliphub-ksuf.onrender.com");
+    : (import.meta.env.VITE_API_URL || "");
       
 export const SOCKET_URL = API_URL;
