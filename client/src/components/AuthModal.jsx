@@ -13,6 +13,24 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
+  const calculatePasswordStrength = (pass) => {
+    let score = 0;
+    if (!pass) return { score, label: '', color: 'bg-gray-700', textColor: 'text-gray-400' };
+    
+    if (pass.length >= 8) score += 1;
+    if (/[A-Z]/.test(pass)) score += 1;
+    if (/[0-9]/.test(pass)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1;
+    
+    if (score === 0 || score === 1) return { score, label: 'Weak', color: 'bg-red-500', textColor: 'text-red-500' };
+    if (score === 2) return { score, label: 'Fair', color: 'bg-yellow-500', textColor: 'text-yellow-500' };
+    if (score === 3) return { score, label: 'Good', color: 'bg-blue-500', textColor: 'text-blue-500' };
+    return { score, label: 'Strong', color: 'bg-green-500', textColor: 'text-green-500' };
+  };
+
+  const strength = calculatePasswordStrength(formData.password);
 
   const { login, signup } = useAuth();
 
@@ -29,6 +47,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }) {
       }
       onClose();
       setFormData({ email: '', password: '', name: '' });
+      setPasswordTouched(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -47,6 +66,7 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }) {
     setMode(mode === 'login' ? 'signup' : 'login');
     setError('');
     setFormData({ email: '', password: '', name: '' });
+    setPasswordTouched(false);
   };
 
   if (!isOpen) return null;
@@ -117,7 +137,12 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }) {
               name="password"
               placeholder="Password"
               value={formData.password}
-              onChange={handleChange}
+              onChange={(e) => {
+                handleChange(e);
+                if (!passwordTouched) {
+                  setPasswordTouched(true);
+                }
+              }}
               required
               minLength="6"
               className="input-base pl-10 pr-10"
@@ -130,6 +155,53 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }) {
               {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
+
+          {mode === 'signup' && (
+            <div 
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                passwordTouched ? 'opacity-100 max-h-[300px]' : 'opacity-0 max-h-0'
+              }`}
+            >
+              <div className="mt-2 space-y-3 p-1">
+                <div className="flex gap-1.5 h-1.5 w-full">
+                  {[1, 2, 3, 4].map((level) => (
+                    <div 
+                      key={level} 
+                      className={`flex-1 rounded-full transition-colors duration-300 ${
+                        strength.score >= level ? strength.color : 'bg-gray-700'
+                      }`}
+                    />
+                  ))}
+                </div>
+                
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-400">Password strength</span>
+                  <span className={`font-medium ${strength.textColor}`}>
+                    {strength.label}
+                  </span>
+                </div>
+
+                <ul className="text-xs space-y-2 mt-2">
+                  <li className={`flex items-center gap-2 transition-colors duration-300 ${formData.password.length >= 8 ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${formData.password.length >= 8 ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    At least 8 characters
+                  </li>
+                  <li className={`flex items-center gap-2 transition-colors duration-300 ${/[A-Z]/.test(formData.password) ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${/[A-Z]/.test(formData.password) ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One uppercase letter
+                  </li>
+                  <li className={`flex items-center gap-2 transition-colors duration-300 ${/[0-9]/.test(formData.password) ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${/[0-9]/.test(formData.password) ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One number
+                  </li>
+                  <li className={`flex items-center gap-2 transition-colors duration-300 ${/[^A-Za-z0-9]/.test(formData.password) ? 'text-green-400' : 'text-gray-400'}`}>
+                    <div className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${/[^A-Za-z0-9]/.test(formData.password) ? 'bg-green-400' : 'bg-gray-600'}`} />
+                    One special character
+                  </li>
+                </ul>
+              </div>
+            </div>
+          )}
 
           <button
             type="submit"
