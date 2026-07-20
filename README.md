@@ -1,5 +1,3 @@
-# 🚀 **ClipHub** - Universal Clipboard & File Transfer
-
 <div align="center">
 
 <img src="./client/public/favicon.ico" alt="ClipHub Logo" width="120" />
