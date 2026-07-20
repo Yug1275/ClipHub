@@ -1,8 +1,8 @@
+# 🚀 ClipHub
+
 <div align="center">
 
 <img src="./client/public/favicon.ico" alt="ClipHub Logo" width="120" />
-
-# ClipHub
 
 ### Universal Clipboard & Secure File Sharing Platform
 
@@ -55,30 +55,195 @@ Whether you're moving notes between your laptop and phone, sharing code snippets
 - View limits
 - QR code sharing
 
-### 📁 File Sharing
-- Drag & drop upload  
-- Multiple formats supported  
-- Download tracking  
-- Smart expiry  
+## 📁 File Sharing
 
-### ⚡ Real-time
-- Live updates  
-- User presence  
-- Instant sync  
+- Secure file uploads
+- Multiple file formats
+- Download tracking
+- Automatic expiry
+- Shareable download links
 
-### 🛡️ Security
-- Auto data deletion  
-- Encrypted passwords  
-- Rate limiting  
-- Input validation  
+## 👤 Authentication
+
+- JWT Authentication
+- User Registration & Login
+- Protected Routes
+- Profile Management
+
+## ⚡ Performance
+
+- Redis caching
+- Fast retrieval
+- Optimized API responses
+- Efficient storage
+
+## 🔒 Security
+
+- Password hashing
+- Input validation
+- Rate limiting
+- Secure authentication
+- Auto cleanup of expired data
 
 ---
 
-## 🚀 **How to Run the Local Version**
+# 🛠 Tech Stack
 
-The local version is perfect for fast transfers on your local network. It does **not** require MongoDB, Redis, or User Authentication.
+| Category | Technologies |
+|-----------|--------------|
+| Frontend | React, Vite, Tailwind CSS |
+| Backend | Node.js, Express.js |
+| Database | MongoDB |
+| Cache | Redis |
+| Authentication | JWT |
+| Storage | Local File Storage |
+| Deployment | Netlify, Render |
 
-> 💡 When running locally, you can completely ignore the `server` folder — it is only used for the global/cloud version.
+---
+
+# 🏗 System Architecture
+
+> Replace this image after generating your architecture diagram.
+
+<p align="center">
+
+<img src="./docs/images/Architecture_Diagram.jpg" width="100%"/>
+
+</p>
+
+---
+
+# 🔄 System Sequence Diagram
+
+> The following sequence diagram outlines the core user journey, from authentication to sharing and downloading content.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as React Frontend
+    participant Auth as Authentication
+    participant Backend as Express Backend
+    participant DB as MongoDB
+    participant Redis as Redis Cache
+    participant Storage as File Storage
+
+    %% 1. User Authenticates
+    User->>Frontend: Enter credentials
+    activate Frontend
+    Frontend->>Auth: Request authentication
+    activate Auth
+    Auth->>DB: Verify user credentials
+    activate DB
+    DB-->>Auth: Verification successful
+    deactivate DB
+    Auth-->>Frontend: Return session token
+    deactivate Auth
+    Frontend-->>User: Display authenticated view
+    deactivate Frontend
+
+    %% 2-4. Content Upload, Validation, and Storage
+    User->>Frontend: Submit content (Text or File)
+    activate Frontend
+    Frontend->>Backend: Upload content with session token
+    activate Backend
+    Backend->>Auth: Validate user session
+    activate Auth
+    Auth-->>Backend: Session valid
+    deactivate Auth
+    
+    Backend->>Backend: Validate content & settings
+    
+    Backend->>DB: Save persistent metadata
+    activate DB
+    DB-->>Backend: Metadata saved
+    deactivate DB
+    
+    Backend->>Redis: Cache content & ephemeral data
+    activate Redis
+    Redis-->>Backend: Cache confirmed
+    deactivate Redis
+    
+    Backend->>Storage: Store physical files
+    activate Storage
+    Storage-->>Backend: Storage confirmed
+    deactivate Storage
+    
+    Backend-->>Frontend: Return secure shareable link
+    deactivate Backend
+    Frontend-->>User: Display shareable link
+    deactivate Frontend
+
+    %% 5-6. Access Shared Content
+    User->>Frontend: Access shareable link
+    activate Frontend
+    Frontend->>Backend: Request shared content
+    activate Backend
+    
+    Backend->>Redis: Check cache
+    activate Redis
+    Redis-->>Backend: Cache hit/miss
+    deactivate Redis
+    
+    Backend->>DB: Fetch metadata & verify access rules
+    activate DB
+    DB-->>Backend: Access granted
+    deactivate DB
+    
+    Backend->>Storage: Retrieve file content (if not cached)
+    activate Storage
+    Storage-->>Backend: Content retrieved
+    deactivate Storage
+    
+    Backend-->>Frontend: Return secure content
+    deactivate Backend
+    Frontend-->>User: Display shared content
+    deactivate Frontend
+```
+
+---
+
+# ⚙️ How ClipHub Works
+
+1. User signs in (optional for text sharing).
+2. User creates a text clip or uploads a file.
+3. Backend validates the request.
+4. Metadata is stored in MongoDB.
+5. Temporary content is cached using Redis when applicable.
+6. Files are stored securely.
+7. A unique shareable link is generated.
+8. Anyone with the link can securely access the shared content.
+
+---
+
+# 📂 Project Structure
+
+```text
+ClipHub/
+├── client/                 # React Frontend (Vite + Tailwind)
+│   ├── public/             # Static assets (Favicon)
+│   ├── src/                
+│   │   ├── components/     # Reusable UI components
+│   │   ├── hooks/          # Custom React hooks (useAuth)
+│   │   ├── pages/          # Application pages (Home, Clip)
+│   │   └── utils/          # Frontend utilities
+│   ├── package.json        
+│   └── vite.config.js      
+│
+├── server/                 # Express Backend (Global Mode)
+│   ├── config/             # DB & Redis connection config
+│   ├── controllers/        # Request handlers (Auth, Clip, File)
+│   ├── middleware/         # Auth & validation middleware
+│   ├── models/             # Mongoose schemas (User, File)
+│   ├── routes/             # API route definitions
+│   ├── utils/              # Backend utilities (JWT, TTL)
+│   ├── index.js            # Entry point
+│   └── package.json        
+│
+├── local-server/           # Express Backend (Local LAN Mode)
+│
+└── README.md               # Project documentation
+```
 
 ---
 
@@ -140,7 +305,7 @@ npm run dev
 
 Application:
 
-```
+```text
 Frontend:
 http://localhost:5173
 
@@ -164,7 +329,7 @@ npm run dev
 
 Then open
 
-```
+```text
 http://localhost:5173
 ```
 
@@ -258,7 +423,3 @@ This project is licensed under the MIT License.
 **Built with ❤️ by Yug Patel**
 
 </div>
-
----
-
-**ClipHub - Share anything, anywhere. Instantly.** 🌟   
