@@ -103,11 +103,9 @@ Whether you're moving notes between your laptop and phone, sharing code snippets
 
 # 🏗 System Architecture
 
-> Replace this image after generating your architecture diagram.
-
 <p align="center">
 
-<img src="./docs/images/Architecture_Diagram.jpg" width="100%"/>
+<img src="./docs/images/Architecture_Diagram.png" width="100%"/>
 
 </p>
 
