@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   Upload, File, X, Download, Trash2, AlertCircle, QrCode,
   Lock, Eye, EyeOff, Shield, Users
@@ -12,7 +12,9 @@ import QRCodeModal from './QRCodeModal';
 import PasswordModal from './PasswordModal';
 import OverwriteWarning from './OverwriteWarning';
 import AuthModal from './AuthModal';
+import UserSearch from './UserSearch';
 import { isLocal } from '../utils/api';
+import { generateKey, encryptFile } from '../utils/encryption';
 
 const FILE_EXPIRY_OPTIONS = [
   { label: '1 hour', value: '1h' },
@@ -45,6 +47,9 @@ export default function FileUpload({ fileKey, onKeyChange }) {
   const [overwriteWarningOpen, setOverwriteWarningOpen] = useState(false);
   const [existingFileInfo, setExistingFileInfo] = useState(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [enableEncryption, setEnableEncryption] = useState(false);
+  const [burnAfterReading, setBurnAfterReading] = useState(false);
 
   // Detect default mode based on IP, allow user to toggle it
   const defaultIsLocal = isLocal;
@@ -105,8 +110,18 @@ export default function FileUpload({ fileKey, onKeyChange }) {
       const options = { uploadMode };
       if (password) options.password = password;
       if (maxDownloads) options.maxViews = maxDownloads; // Using maxViews for consistency
+      if (selectedUser) options.recipientId = selectedUser._id;
+      if (burnAfterReading) options.burnAfterReading = true;
 
-      await uploadFile(fileKey, selectedFile, expiry, options);
+      let fileToUpload = selectedFile;
+      if (enableEncryption) {
+        const encryptionKey = await generateKey();
+        fileToUpload = await encryptFile(selectedFile, encryptionKey);
+        options.encrypted = true;
+        window.location.hash = encryptionKey;
+      }
+
+      await uploadFile(fileKey, fileToUpload, expiry, options);
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
       setSelectedFile(null);
@@ -120,7 +135,32 @@ export default function FileUpload({ fileKey, onKeyChange }) {
     if (!fileKey) return;
 
     try {
-      await downloadFile(fileKey, inputPassword);
+      const fileInfoReq = await checkFileExists(fileKey);
+      if (!fileInfoReq.exists) {
+        toast.error('File not found');
+        return;
+      }
+
+      const options = {};
+      if (fileInfoReq.info.burnAfterReading) {
+        const proceed = window.confirm("This file is set to burn after reading. Downloading it will permanently delete it from the server. Proceed?");
+        if (!proceed) return;
+      }
+
+      if (fileInfoReq.info.encrypted) {
+        let keyHash = window.location.hash.replace('#', '');
+        if (!keyHash) {
+          keyHash = window.prompt("This file is end-to-end encrypted. Please enter the decryption key:");
+          if (!keyHash) {
+            toast.error('Decryption key is required for encrypted files');
+            return;
+          }
+          window.location.hash = keyHash;
+        }
+        options.decryptionKey = keyHash;
+      }
+
+      await downloadFile(fileKey, inputPassword, options);
       toast.success('Download started!');
     } catch (err) {
       if (err.message.includes('password protected')) {
@@ -344,6 +384,25 @@ export default function FileUpload({ fileKey, onKeyChange }) {
           {showAdvancedOptions && (
             <div className="glass rounded-xl p-4 space-y-4">
 
+              {/* Targeted Sharing */}
+              <div>
+                <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
+                  <Users size={14} />
+                  Share with specific user (optional)
+                </label>
+                {isAuthenticated ? (
+                  <UserSearch 
+                    selectedUser={selectedUser} 
+                    onSelect={setSelectedUser} 
+                    onClear={() => setSelectedUser(null)} 
+                  />
+                ) : (
+                  <div className="text-xs text-gray-400 bg-black/20 p-2 rounded-lg border border-white/5">
+                    Please sign in to share directly with other users.
+                  </div>
+                )}
+              </div>
+
               {/* Password Protection */}
               <div>
                 <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
@@ -370,7 +429,50 @@ export default function FileUpload({ fileKey, onKeyChange }) {
                 </div>
               </div>
 
+              {/* E2E Encryption Toggle */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={enableEncryption}
+                    onChange={(e) => setEnableEncryption(e.target.checked)}
+                    className="rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-black/40"
+                  />
+                  <span className="text-sm text-gray-300 flex items-center gap-2">
+                    <Shield size={14} />
+                    End-to-End Encryption
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  Encrypts file on your device. The server cannot read it. 
+                  A decryption key will be appended to the URL (e.g. #key).
+                </p>
+              </div>
+
+              {/* Burn After Reading Toggle */}
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={burnAfterReading}
+                    onChange={(e) => {
+                      setBurnAfterReading(e.target.checked);
+                      if (e.target.checked) setMaxDownloads(null); // Mutually exclusive with max downloads
+                    }}
+                    className="rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-black/40"
+                  />
+                  <span className="text-sm text-gray-300 flex items-center gap-2">
+                    <Trash2 size={14} />
+                    Burn After Reading
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500 mt-1 pl-6">
+                  The file will be permanently deleted from the server immediately after it is downloaded once.
+                </p>
+              </div>
+
               {/* Download Limit */}
+              {!burnAfterReading && (
               <div>
                 <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
                   <Users size={14} />
@@ -399,6 +501,7 @@ export default function FileUpload({ fileKey, onKeyChange }) {
                   </p>
                 )}
               </div>
+              )}
 
             </div>
           )}

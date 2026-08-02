@@ -60,6 +60,24 @@ const fileSchema = new mongoose.Schema({
   isPublic: {
     type: Boolean,
     default: false
+  },
+  recipient: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  visibility: {
+    type: String,
+    enum: ['public-key', 'private-user'],
+    default: 'public-key'
+  },
+  encrypted: {
+    type: Boolean,
+    default: false
+  },
+  burnAfterReading: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

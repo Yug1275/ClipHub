@@ -4,10 +4,11 @@ import { getSecondsFromExpiry } from '../utils/ttl.js';
 import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
+import { broadcastToUser } from '../config/socket.js';
 
 export const uploadFile = async (req, res) => {
   try {
-    const { key, expiry = '1d', password, maxViews } = req.body;
+    const { key, expiry = '1d', password, maxViews, recipientId, encrypted, burnAfterReading } = req.body;
     const user = req.user;
 
     if (!key) {
@@ -63,7 +64,11 @@ export const uploadFile = async (req, res) => {
       expiry,
       maxDownloads: maxViews ? parseInt(maxViews) : null,
       hasPassword: !!password,
-      password: password ? await bcrypt.hash(password, 10) : null
+      password: password ? await bcrypt.hash(password, 10) : null,
+      recipient: recipientId || null,
+      visibility: recipientId ? 'private-user' : 'public-key',
+      encrypted: !!encrypted,
+      burnAfterReading: !!burnAfterReading
     });
 
     await fileRecord.save();
@@ -82,10 +87,18 @@ export const uploadFile = async (req, res) => {
       createdAt: fileRecord.createdAt.toISOString(),
       type: 'file',
       hasPassword: !!password,
-      maxDownloads: fileRecord.maxDownloads
+      maxDownloads: fileRecord.maxDownloads,
+      recipient: fileRecord.recipient ? fileRecord.recipient.toString() : null,
+      visibility: fileRecord.visibility,
+      encrypted: fileRecord.encrypted,
+      burnAfterReading: fileRecord.burnAfterReading
     };
 
     await redis.setEx(`file:${key}`, ttlSeconds, JSON.stringify(fileMetadata));
+
+    if (recipientId) {
+      broadcastToUser(recipientId, 'newSharedItem', { type: 'file', key });
+    }
 
     res.status(201).json({
       success: true,
@@ -97,6 +110,8 @@ export const uploadFile = async (req, res) => {
         mimetype: req.file.mimetype,
         uploadedBy: user.name,
         hasPassword: !!password,
+        encrypted: !!encrypted,
+        burnAfterReading: !!burnAfterReading,
         maxDownloads: fileRecord.maxDownloads,
         url: `${req.protocol}://${req.get('host')}/clip?key=${key}`,
         downloadUrl: `${req.protocol}://${req.get('host')}/api/file/${key}`
@@ -143,6 +158,13 @@ export const downloadFile = async (req, res) => {
       return res.status(404).json({
         error: 'File not found or has expired'
       });
+    }
+
+    // Check visibility
+    if (fileRecord.visibility === 'private-user') {
+      if (!req.user || req.user._id.toString() !== fileRecord.recipient.toString()) {
+        return res.status(403).json({ error: 'Access denied. This file is private.' });
+      }
     }
 
     // Check password protection
@@ -193,8 +215,8 @@ export const downloadFile = async (req, res) => {
     await fileRecord.save();
 
     // Check if should delete after this download
-    const shouldDelete = fileRecord.maxDownloads && 
-                        fileRecord.downloadCount >= fileRecord.maxDownloads;
+    const shouldDelete = fileRecord.burnAfterReading || (fileRecord.maxDownloads && 
+                        fileRecord.downloadCount >= fileRecord.maxDownloads);
 
     if (shouldDelete) {
       // Delete file after this download
@@ -251,6 +273,13 @@ export const getFileInfo = async (req, res) => {
       });
     }
 
+    // Check visibility
+    if (fileRecord.visibility === 'private-user') {
+      if (!req.user || req.user._id.toString() !== fileRecord.recipient.toString()) {
+        return res.status(403).json({ error: 'Access denied. This file is private.' });
+      }
+    }
+
     res.json({
       success: true,
       file: {
@@ -261,11 +290,13 @@ export const getFileInfo = async (req, res) => {
         downloadCount: fileRecord.downloadCount,
         maxDownloads: fileRecord.maxDownloads,
         hasPassword: fileRecord.hasPassword,
+        encrypted: fileRecord.encrypted,
+        burnAfterReading: fileRecord.burnAfterReading,
         uploadedBy: fileRecord.uploadedBy.name,
         createdAt: fileRecord.createdAt,
         expiresAt: fileRecord.expiresAt,
-        willExpireAfterNextDownload: fileRecord.maxDownloads && 
-          fileRecord.downloadCount >= fileRecord.maxDownloads - 1
+        willExpireAfterNextDownload: fileRecord.burnAfterReading || (fileRecord.maxDownloads && 
+          fileRecord.downloadCount >= fileRecord.maxDownloads - 1)
       }
     });
 
@@ -343,7 +374,9 @@ export const checkFileExists = async (req, res) => {
           createdAt: fileRecord.createdAt,
           downloadCount: fileRecord.downloadCount,
           maxDownloads: fileRecord.maxDownloads,
-          hasPassword: fileRecord.hasPassword
+          hasPassword: fileRecord.hasPassword,
+          encrypted: fileRecord.encrypted,
+          burnAfterReading: fileRecord.burnAfterReading
         }
       });
     } else {
@@ -353,5 +386,25 @@ export const checkFileExists = async (req, res) => {
   } catch (error) {
     console.error('Error checking file exists:', error);
     res.status(500).json({ error: 'Failed to check file' });
+  }
+};
+
+export const getInbox = async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    
+    const files = await File.find({ recipient: userId })
+      .populate('uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .select('key originalName size mimetype downloadCount maxDownloads hasPassword encrypted burnAfterReading createdAt expiresAt')
+      .lean();
+
+    res.json({
+      success: true,
+      files
+    });
+  } catch (error) {
+    console.error('Error getting inbox files:', error);
+    res.status(500).json({ error: 'Failed to retrieve inbox files' });
   }
 };

@@ -1,4 +1,4 @@
-﻿import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './hooks/useAuth'
 import { ToastProvider } from './components/Toast'
 import ThreeBackground from './components/ThreeBackground'
@@ -7,6 +7,7 @@ import Footer    from './components/Footer'
 import HomePage  from './pages/HomePage'
 import ClipPage  from './pages/ClipPage'
 import DocsPage  from './pages/DocsPage'
+import InboxPage from './pages/InboxPage'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="/"      element={<HomePage />} />
             <Route path="/clip"  element={<ClipPage  />} />
             <Route path="/docs"  element={<DocsPage  />} />
+            <Route path="/inbox" element={<InboxPage />} />
           </Routes>
           <Footer />
         </BrowserRouter>

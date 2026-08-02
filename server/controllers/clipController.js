@@ -1,9 +1,11 @@
 import { getRedisClient } from '../config/redis.js';
 import { getSecondsFromExpiry, isOneTimeExpiry } from '../utils/ttl.js';
 import bcrypt from 'bcryptjs';
+import { broadcastToUser } from '../config/socket.js';
 
 const APP_MODE = process.env.APP_MODE || 'global';
 const localStore = new Map();
+const localInbox = new Map();
 
 // Auto cleanup for local store
 if (APP_MODE === 'local') {
@@ -19,7 +21,7 @@ if (APP_MODE === 'local') {
 
 export const saveClip = async (req, res) => {
   try {
-    const { key, content, expiry = '1h', password, maxViews } = req.body;
+    const { key, content, expiry = '1h', password, maxViews, recipientId, encrypted, burnAfterReading } = req.body;
 
     if (!key || !content) {
       return res.status(400).json({ 
@@ -55,7 +57,11 @@ export const saveClip = async (req, res) => {
       type: 'text',
       hasPassword: !!password,
       password: password ? await bcrypt.hash(password, 10) : null,
-      createdBy: req.ip
+      createdBy: req.ip,
+      recipient: recipientId || null,
+      visibility: recipientId ? 'private-user' : 'public-key',
+      encrypted: !!encrypted,
+      burnAfterReading: !!burnAfterReading
     };
 
     let exists = false;
@@ -65,10 +71,26 @@ export const saveClip = async (req, res) => {
       const storedData = { ...clipData };
       storedData.expiryTime = Date.now() + (ttlSeconds * 1000);
       localStore.set(key, storedData);
+
+      if (recipientId) {
+        if (!localInbox.has(recipientId)) localInbox.set(recipientId, new Set());
+        localInbox.get(recipientId).add(key);
+      }
     } else {
       const redis = getRedisClient();
       exists = await redis.exists(`clip:${key}`);
       await redis.setEx(`clip:${key}`, ttlSeconds, JSON.stringify(clipData));
+      
+      if (recipientId) {
+        await redis.sAdd(`user:${recipientId}:inbox_clips`, key);
+        // We set expire on the set member implicitly via the clip expiring.
+        // The getInbox method cleans up expired ones.
+      }
+    }
+
+    // Emit event if it's for a specific user
+    if (recipientId) {
+      broadcastToUser(recipientId, 'newSharedItem', { type: 'clip', key });
     }
 
     res.json({
@@ -78,6 +100,8 @@ export const saveClip = async (req, res) => {
       expiresIn: ttlSeconds,
       overwritten: !!exists,
       hasPassword: !!password,
+      encrypted: !!encrypted,
+      burnAfterReading: !!burnAfterReading,
       maxViews: clipData.maxViews,
       url: `${req.protocol}://${req.get('host')}/clip?key=${key}`,
       apiUrl: `${req.protocol}://${req.get('host')}/api/clip/${key}`
@@ -116,6 +140,13 @@ export const getClip = async (req, res) => {
       remainingTTL = await redis.ttl(`clip:${key}`);
     }
 
+    // Check visibility
+    if (clipData.visibility === 'private-user') {
+      if (!req.user || req.user._id.toString() !== clipData.recipient) {
+        return res.status(403).json({ error: 'Access denied. This clip is private.' });
+      }
+    }
+
     // Check password protection
     if (clipData.hasPassword) {
       if (!password) {
@@ -145,8 +176,9 @@ export const getClip = async (req, res) => {
     // Increment view count
     clipData.viewCount += 1;
 
-    // Check if it's a one-time clip or reached max views
+    // Check if it's a one-time clip, reached max views, or burn after reading
     const shouldDelete = clipData.oneTime || 
+                        clipData.burnAfterReading ||
                         (clipData.maxViews && clipData.viewCount >= clipData.maxViews);
 
     if (shouldDelete) {
@@ -172,6 +204,8 @@ export const getClip = async (req, res) => {
         expiresIn: remainingTTL,
         oneTime: clipData.oneTime,
         type: clipData.type,
+        encrypted: clipData.encrypted,
+        burnAfterReading: clipData.burnAfterReading,
         willExpireAfterView: shouldDelete
       }
     });
@@ -249,7 +283,9 @@ export const getClipInfo = async (req, res) => {
         type: clipData.type,
         contentLength: clipData.content.length,
         hasPassword: clipData.hasPassword,
-        willExpireAfterNextView: clipData.oneTime || 
+        encrypted: clipData.encrypted,
+        burnAfterReading: clipData.burnAfterReading,
+        willExpireAfterNextView: clipData.oneTime || clipData.burnAfterReading ||
           (clipData.maxViews && clipData.viewCount >= clipData.maxViews - 1)
       }
     });
@@ -295,7 +331,9 @@ export const checkClipExists = async (req, res) => {
           expiresIn: remainingTTL,
           type: clipData.type,
           hasPassword: clipData.hasPassword,
-          contentPreview: clipData.content.substring(0, 50) + (clipData.content.length > 50 ? '...' : '')
+          encrypted: clipData.encrypted,
+          burnAfterReading: clipData.burnAfterReading,
+          contentPreview: clipData.encrypted ? '[Encrypted Content]' : clipData.content.substring(0, 50) + (clipData.content.length > 50 ? '...' : '')
         }
       });
     } else {
@@ -305,5 +343,66 @@ export const checkClipExists = async (req, res) => {
   } catch (error) {
     console.error('Error checking clip exists:', error);
     res.status(500).json({ error: 'Failed to check clip' });
+  }
+};
+
+export const getInbox = async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    const clips = [];
+    
+    if (APP_MODE === 'local') {
+      const userClips = localInbox.get(userId);
+      if (userClips) {
+        for (const key of userClips) {
+          const data = localStore.get(key);
+          if (data && data.expiryTime > Date.now()) {
+            clips.push({
+              key,
+              type: data.type,
+              createdAt: data.createdAt,
+              contentPreview: data.encrypted ? '[Encrypted Content]' : data.content.substring(0, 50) + (data.content.length > 50 ? '...' : ''),
+              hasPassword: data.hasPassword,
+              encrypted: data.encrypted
+            });
+          } else {
+            userClips.delete(key);
+          }
+        }
+      }
+    } else {
+      const redis = getRedisClient();
+      const userSetKey = `user:${userId}:inbox_clips`;
+      const keys = await redis.sMembers(userSetKey);
+      
+      for (const key of keys) {
+        const clipDataString = await redis.get(`clip:${key}`);
+        if (clipDataString) {
+          const data = JSON.parse(clipDataString);
+          clips.push({
+            key,
+            type: data.type,
+            createdAt: data.createdAt,
+            contentPreview: data.encrypted ? '[Encrypted Content]' : data.content.substring(0, 50) + (data.content.length > 50 ? '...' : ''),
+            hasPassword: data.hasPassword,
+            encrypted: data.encrypted
+          });
+        } else {
+          // Clean up expired key from set
+          await redis.sRem(userSetKey, key);
+        }
+      }
+    }
+
+    // Sort by createdAt descending
+    clips.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.json({
+      success: true,
+      clips
+    });
+  } catch (error) {
+    console.error('Error getting inbox clips:', error);
+    res.status(500).json({ error: 'Failed to retrieve inbox clips' });
   }
 };

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Copy, Check, Save, Clock, Trash2, Key, Download, AlertCircle,
@@ -12,12 +12,13 @@ import AuthModal from '../components/AuthModal'
 import QRCodeModal from '../components/QRCodeModal'
 import PasswordModal from '../components/PasswordModal'
 import OverwriteWarning from '../components/OverwriteWarning'
+import UserSearch from '../components/UserSearch'
 import { useSocket } from '../hooks/useSocket'
 import { motion, AnimatePresence } from 'framer-motion'
 import StatusIndicator from '../components/StatusIndicator'
-import AnimatedCard from '../components/AnimatedCard'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { isLocal } from '../utils/api'
+import { generateKey, encryptText, decryptText } from '../utils/encryption'
 
 const EXPIRY_OPTIONS = [
   { label: '1 min', value: '1m' },
@@ -61,6 +62,9 @@ export default function ClipPage() {
   const [existingClipInfo, setExistingClipInfo] = useState(null)
   const [pendingPassword, setPendingPassword] = useState('')
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [enableEncryption, setEnableEncryption] = useState(false)
+  const [burnAfterReading, setBurnAfterReading] = useState(false)
 
   const { saveClip, getClip, deleteClip, checkClipExists, loading, error } = useClipboard()
   const { user, isAuthenticated } = useAuth()
@@ -82,10 +86,20 @@ export default function ClipPage() {
     if (key && socket.isConnected && user?.name) {
       socket.joinClip(key, user.name)
 
-      const cleanup = socket.onContentUpdate((data) => {
+      const cleanup = socket.onContentUpdate(async (data) => {
         if (data.socketId !== socket.socket?.id) {
-          // Immediately update content instead of waiting for refresh
-          setContent(data.content)
+          let updatedContent = data.content
+          if (data.encrypted) {
+            const keyHash = window.location.hash.replace('#', '')
+            if (keyHash) {
+              try {
+                updatedContent = await decryptText(data.content, keyHash)
+              } catch (e) {
+                console.error("Failed to decrypt real-time update", e)
+              }
+            }
+          }
+          setContent(updatedContent)
         }
       })
 
@@ -116,11 +130,13 @@ export default function ClipPage() {
     }
   }
 
-  const handleContentChange = (e) => {
+  const handleContentChange = async (e) => {
     const newContent = e.target.value
     setContent(newContent)
 
-    if (key && socket.isConnected) {
+    if (key && socket.isConnected && !enableEncryption) {
+      // Disabling real-time sync for encrypted typing to save perf/complexity,
+      // it will still sync on save.
       socket.emitContentChange(key, newContent)
       
       if (!isTyping) {
@@ -165,8 +181,24 @@ export default function ClipPage() {
       const options = {}
       if (password) options.password = password
       if (maxViews) options.maxViews = maxViews
+      if (selectedUser) options.recipientId = selectedUser._id
+      if (burnAfterReading) options.burnAfterReading = true
+      
+      let payloadContent = content
+      if (enableEncryption) {
+        const encryptionKey = await generateKey()
+        payloadContent = await encryptText(content, encryptionKey)
+        options.encrypted = true
+        window.location.hash = encryptionKey
+      }
 
-      const result = await saveClip(key, content, expiry, options)
+      const result = await saveClip(key, payloadContent, expiry, options)
+      
+      if (enableEncryption && socket.isConnected) {
+        // Sync encrypted content
+        socket.emitContentChange(key, payloadContent, { encrypted: true })
+      }
+
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       setApiError('')
@@ -180,8 +212,31 @@ export default function ClipPage() {
     if (!key) return
 
     try {
+      const clipInfoReq = await checkClipExists(key)
+      if (clipInfoReq.exists && clipInfoReq.info.burnAfterReading) {
+        const proceed = window.confirm("This clip is set to burn after reading. Loading it will permanently delete it from the server. Proceed?")
+        if (!proceed) return
+      }
+
       const result = await getClip(key, inputPassword)
-      setContent(result.data.content)
+      let loadedContent = result.data.content
+      
+      if (result.data.encrypted) {
+        setEnableEncryption(true)
+        let keyHash = window.location.hash.replace('#', '')
+        if (!keyHash) {
+          keyHash = window.prompt("This clip is end-to-end encrypted. Please enter the decryption key (found in the original URL after #):")
+          if (!keyHash) throw new Error('Decryption key is required for encrypted clips')
+          window.location.hash = keyHash
+        }
+        try {
+          loadedContent = await decryptText(loadedContent, keyHash)
+        } catch (err) {
+          throw new Error('Failed to decrypt clip. The key might be invalid.')
+        }
+      }
+
+      setContent(loadedContent)
       setApiError('')
       toast.success('Clip loaded successfully!')
 
@@ -394,6 +449,25 @@ export default function ClipPage() {
             {showAdvancedOptions && (
               <div className="glass rounded-xl p-4 mb-4 space-y-4">
 
+                {/* Targeted Sharing */}
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
+                    <Users size={14} />
+                    Share with specific user (optional)
+                  </label>
+                  {isAuthenticated ? (
+                    <UserSearch 
+                      selectedUser={selectedUser} 
+                      onSelect={setSelectedUser} 
+                      onClear={() => setSelectedUser(null)} 
+                    />
+                  ) : (
+                    <div className="text-xs text-gray-400 bg-black/20 p-2 rounded-lg border border-white/5">
+                      Please sign in to share directly with other users.
+                    </div>
+                  )}
+                </div>
+
                 {/* Password Protection */}
                 <div>
                   <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
@@ -420,7 +494,53 @@ export default function ClipPage() {
                   </div>
                 </div>
 
+                {/* E2E Encryption Toggle */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={enableEncryption}
+                      onChange={(e) => setEnableEncryption(e.target.checked)}
+                      className="rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-black/40"
+                    />
+                    <span className="text-sm text-gray-300 flex items-center gap-2">
+                      <Shield size={14} />
+                      End-to-End Encryption
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 pl-6">
+                    Encrypts content on your device. The server cannot read it. 
+                    A decryption key will be appended to the URL (e.g. #key).
+                  </p>
+                </div>
+
+                {/* Burn After Reading Toggle */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={burnAfterReading}
+                      onChange={(e) => {
+                        setBurnAfterReading(e.target.checked)
+                        if (e.target.checked) {
+                          setMaxViews(null)
+                          setExpiry('1d') // Or another sensible default
+                        }
+                      }}
+                      className="rounded border-gray-600 text-brand-500 focus:ring-brand-500 bg-black/40"
+                    />
+                    <span className="text-sm text-gray-300 flex items-center gap-2">
+                      <Trash2 size={14} />
+                      Burn After Reading
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 pl-6">
+                    The clip will be permanently deleted from the server immediately after it is read once.
+                  </p>
+                </div>
+
                 {/* View Limit */}
+                {!burnAfterReading && (
                 <div>
                   <label className="block text-sm text-gray-300 mb-2 flex items-center gap-2">
                     <Users size={14} />
@@ -449,6 +569,7 @@ export default function ClipPage() {
                     </p>
                   )}
                 </div>
+                )}
 
               </div>
             )}

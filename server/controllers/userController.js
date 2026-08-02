@@ -62,3 +62,47 @@ export const uploadProfileImage = async (req, res) => {
     });
   }
 };
+
+export const searchUsers = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || q.length < 2) {
+      return res.json({ success: true, users: [] });
+    }
+
+    const regex = new RegExp(q, 'i');
+    // Search by name or email (partial match, case-insensitive)
+    const users = await User.find({
+      $or: [{ name: regex }, { email: regex }],
+      isActive: true,
+      _id: { $ne: req.user._id } // Don't return the current user
+    })
+    .select('_id name email profileImage')
+    .limit(10)
+    .lean();
+
+    // Mask the email slightly for privacy if desired, or just return it. 
+    // The prompt says "minimal public fields, never password hashes or emails in full."
+    const maskedUsers = users.map(u => {
+      const parts = u.email.split('@');
+      const maskedEmail = parts[0].length > 2 
+        ? `${parts[0].substring(0, 2)}***@${parts[1]}` 
+        : `***@${parts[1]}`;
+        
+      return {
+        _id: u._id,
+        name: u.name,
+        email: maskedEmail,
+        profileImage: u.profileImage
+      };
+    });
+
+    res.json({
+      success: true,
+      users: maskedUsers
+    });
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+};

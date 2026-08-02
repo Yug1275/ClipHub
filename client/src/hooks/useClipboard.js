@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { API_URL } from '../utils/api';
+import { useAuth } from './useAuth';
 
 export const useClipboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { authFetch } = useAuth();
 
   const saveClip = async (key, content, expiry = '1h', options = {}) => {
     setLoading(true);
@@ -17,7 +18,7 @@ export const useClipboard = () => {
         ...options // password, maxViews
       };
 
-      const response = await fetch(`${API_URL}/api/clip`, {
+      const response = await authFetch(`/api/clip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -45,12 +46,12 @@ export const useClipboard = () => {
     setError(null);
     
     try {
-      const url = new URL(`${API_URL}/api/clip/${key}`);
+      const url = new URL(`/api/clip/${key}`, window.location.origin);
       if (password) {
         url.searchParams.append('password', password);
       }
 
-      const response = await fetch(url);
+      const response = await authFetch(url.pathname + url.search);
       const data = await response.json();
       
       if (!response.ok) {
@@ -68,7 +69,7 @@ export const useClipboard = () => {
 
   const checkClipExists = async (key) => {
     try {
-      const response = await fetch(`${API_URL}/api/clip/${key}/exists`);
+      const response = await authFetch(`/api/clip/${key}/exists`);
       const data = await response.json();
       
       if (!response.ok) {
@@ -86,7 +87,7 @@ export const useClipboard = () => {
     setError(null);
     
     try {
-      const response = await fetch(`${API_URL}/api/clip/${key}`, {
+      const response = await authFetch(`/api/clip/${key}`, {
         method: 'DELETE',
       });
 
@@ -107,7 +108,7 @@ export const useClipboard = () => {
 
   const getClipInfo = async (key) => {
     try {
-      const response = await fetch(`${API_URL}/api/clip/${key}/info`);
+      const response = await authFetch(`/api/clip/${key}/info`);
       const data = await response.json();
       
       if (!response.ok) {

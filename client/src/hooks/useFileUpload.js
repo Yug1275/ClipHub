@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from './useAuth';
 import { API_URL } from '../utils/api';
+import { decryptFile } from '../utils/encryption';
 
 export const useFileUpload = () => {
   const [uploading, setUploading] = useState(false);
@@ -22,6 +23,8 @@ export const useFileUpload = () => {
       // Add optional parameters
       if (options.password) formData.append('password', options.password);
       if (options.maxViews) formData.append('maxViews', options.maxViews.toString());
+      if (options.encrypted) formData.append('encrypted', 'true');
+      if (options.recipientId) formData.append('recipientId', options.recipientId);
 
       const data = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -116,7 +119,7 @@ export const useFileUpload = () => {
     }
   };
 
-  const downloadFile = async (key, password = null) => {
+  const downloadFile = async (key, password = null, options = {}) => {
     try {
       
       let url = `${API_URL}/api/file/${key}`;
@@ -134,7 +137,12 @@ export const useFileUpload = () => {
       }
       
       // Create blob and download
-      const blob = await response.blob();
+      let blob = await response.blob();
+      
+      if (options.decryptionKey) {
+        blob = await decryptFile(blob, options.decryptionKey);
+      }
+      
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;

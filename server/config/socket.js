@@ -59,6 +59,13 @@ export const initializeSocket = (server) => {
       console.log(`👤 ${socket.userName} joined clip: ${key}`);
     });
 
+    // Join a user-specific room for private shares
+    socket.on('join-user-room', (userId) => {
+      if (!userId) return;
+      socket.join(`user:${userId}`);
+      console.log(`👤 User ${userId} joined their personal room`);
+    });
+
     // Leave clip room
     socket.on('leave-clip', () => {
       if (socket.clipKey) {
@@ -206,5 +213,12 @@ export const broadcastClipUpdate = (key, updateData) => {
 export const broadcastFileUpdate = (key, updateData) => {
   if (io) {
     io.to(`file:${key}`).emit('file-updated', updateData);
+  }
+};
+
+// Emit updates to a specific user
+export const broadcastToUser = (userId, event, data) => {
+  if (io) {
+    io.to(`user:${userId}`).emit(event, data);
   }
 };

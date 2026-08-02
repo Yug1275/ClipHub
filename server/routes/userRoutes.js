@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { authenticateToken } from '../middleware/auth.js';
-import { uploadProfileImage } from '../controllers/userController.js';
+import { uploadProfileImage, searchUsers } from '../controllers/userController.js';
 
 const router = express.Router();
 
@@ -44,5 +44,7 @@ const upload = multer({
 });
 
 router.post('/upload-profile', authenticateToken, upload.single('profileImage'), uploadProfileImage);
+
+router.get('/search', authenticateToken, searchUsers);
 
 export default router;

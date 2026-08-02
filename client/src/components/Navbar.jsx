@@ -21,6 +21,7 @@ export default function Navbar() {
   const links = [
     { to: '/', label: 'Home' },
     { to: '/clip', label: 'Clip' },
+    { to: '/inbox', label: 'Inbox' },
     { to: '/docs', label: 'Docs' },
   ]
 
